@@ -8,6 +8,7 @@
 import threading 
 import time
 from b2 import thread2 
+from b2 import exceptions2
 import re
 import collections
 
@@ -16,7 +17,8 @@ _CONDITION_TYPES =[
                     ("ALL", "^\\*$"),
                     ("TIME_RANGE" , "^(\d+)-(\d+)$"),
                     ("EVERY" , "^\\*/(\d+)$"),
-                    ("TIME_RANGE_EVERY" , "^(\d+)-(\d+)/(\d+)$")
+                    ("TIME_RANGE_EVERY" , "^(\d+)-(\d+)/(\d+)$"),
+                    ("NUM" , "^(\d+)$")
                    ]
 _CONDITION_TYPE_PATTERN = re.compile(ur"|".join(ur"(?P<%s>%s)" % (_type , _pattern) for _type , _pattern in _CONDITION_TYPES ))
 _CONDITION_TYPE_PATTERNS = collections.OrderedDict([(_type , re.compile(_pattern).match) for _type , _pattern in _CONDITION_TYPES ])
@@ -42,19 +44,23 @@ class CTCondition(object):
             match = _pattern(condition)
             if match:
                 return _type , match.groups()
-        raise ValueError
+        raise Exception("{0} is format vaild !".format(condition)) 
 
     def _init_params(self , condition_type , group_tuples):
         self._start_time = None 
         self._end_time = None 
         self._every = None 
-        self.judge = None 
-        group_tuples = [ int(value) for value in group_tuples]
-        if self.condition_type == "ALL":
-            self.judge = self.return_true
+        self._num = None 
+        self.judge = None
+        group_tuples = [ int(value) if value != "*" else value for value in group_tuples ]
+        if self.condition_type == "ALL" or self.condition_type == "NUM":
+            self._num = "*"
+            if self.condition_type == "NUM":
+                self._num = group_tuples[0]
+            self.judge = self.equal
         elif self.condition_type == "EVERY":
             self.judge = self.every 
-            self._every = group_tuples(0)
+            self._every = group_tuples[0]
         elif self.condition_type == "TIME_RANGE":
             self.judge = self.time_range 
             self._start_time , self._end_time = group_tuples 
@@ -64,8 +70,11 @@ class CTCondition(object):
         else:
             raise NotImplmetionError 
         
-    def return_true(object):
-        return True
+    
+    def equal(self , value):
+        if self._num == "*" or self._num == value:
+            return True 
+        return False
 
     def every(self ,value):
         """实现 crontab中 */3 判断语句
@@ -105,7 +114,7 @@ class CTCondition(object):
         return False
     
     def __str__(self):
-        return "start_time:{start_time} end_time:{end_time} every:{every}".format(start_time = self._start_time , end_time = self._end_time , every = self._every)
+        return "start_time:{start_time} end_time:{end_time} every:{every} num:{num}".format(start_time = self._start_time , end_time = self._end_time , every = self._every , num = self._num )
 
 class CTItem(object):
 
@@ -113,6 +122,7 @@ class CTItem(object):
 
     def __init__(self , condition ):
         self.conditions = self.parse(condition)
+        self.condition_string = condition
 
     def __eq__(self , obj):
         if isinstance(obj , int):
@@ -141,58 +151,78 @@ class TimeObject(object):
     """
 
 
-    def __init__(self , ct_string = None , week = None , month = None , day = None , hour = None , minute = None ):
+    def __init__(self , command , ct_string = None   , week = None , month = None , day = None , hour = None , minute = None ):
+        self.command = command 
         if ct_string is None and (week is None or month is None or day is None or hour is None or minute is None ):
             raise ValueError
         if ct_string is not None:
             self.week , self.month , self.day , self.hour , self.minute = self.parser(ct_string)
         else:
-            self.week , self.month , self.day , self.hour , self.minute = week , month , day , hour , minute 
+            self.week , self.month , self.day , self.hour , self.minute = CTItem(week) , CTItem(month) , CTItem(day) , CTItem(hour) , CTItem(minute) 
 
     def parser(self , ct_string):
         params = ct_string.split()
         if len(params) != 5:
-            raise ValueError
-        week , month , day , hour , minute = params
+            raise ValueError(params)
+        week , month , day , hour , minute = [ CTItem(param) for param in params ]
         return week , month , day , hour , minute 
 
     def __eq__(self , obj):
         if obj and isinstance(obj,(list , tuple)):
             if len(obj) == 5:
+                print obj 
                 if self.week != obj[4]:
+                    print "week"
                     return False
-                if self.day != obj[3]:
+                if self.month != obj[3]:
+                    print "month"
                     return False
-                if self.hour != obj[2]:
+                if self.day != obj[2]:
+                    print "day"
                     return False
-                if self.minute != obj[1]:
+                if self.hour != obj[1]:
+                    print "hour"
                     return False
                 if self.minute != obj[0]:
+                    print "minute"
                     return False
             return True
         return False
 
 
     
-class Ticker(threading.Thread):
+class PyCt(threading.Thread):
 
 
     def __init__(self , pool_size = 100):
-        super(Ticker , self).__init__()
+        super(PyCt , self).__init__()
         self._run_flag = True
         self.crontabs = []
         self.workers = thread2.ThreadPool(pool_size) 
+        self.workers.start()
+        self.setDaemon(True)
+        self.start()
+        self.join()
         
     def add(self , ctstring , command , *argv , **kw ):
-        pass 
+        self.crontabs.append(TimeObject(thread2.Command(command , *argv , **kw) , ctstring))
 
     def run(self):
 
         while self._run_flag:
-            time.sleep(1)
+            time.sleep(60)
+            _now = time.gmtime(time.time())
+            print "run"
+            for ct in self.crontabs:
+                if ct == (_now.tm_min , _now.tm_hour , _now.tm_mday, _now.tm_mon , _now.tm_wday):
+                    self.workers.add_command(ct.command)
 
 
 
 
 if __name__ == "__main__":
-    pass
+    c = PyCt()
+    def p(*argv , **kw):
+        print "hi"
+    c.add("* * * * *", p , *[] , **{}) 
+    print c == (3 , 12 , 13 ,14 ,15)
