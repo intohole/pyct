@@ -9,42 +9,104 @@ import threading
 import time
 from b2 import thread2 
 import re
+import collections
 
 
+_CONDITION_TYPES =[
+                    ("ALL", "^\\*$"),
+                    ("TIME_RANGE" , "^(\d+)-(\d+)$"),
+                    ("EVERY" , "^\\*/(\d+)$"),
+                    ("TIME_RANGE_EVERY" , "^(\d+)-(\d+)/(\d+)$")
+                   ]
+_CONDITION_TYPE_PATTERN = re.compile(ur"|".join(ur"(?P<%s>%s)" % (_type , _pattern) for _type , _pattern in _CONDITION_TYPES ))
+_CONDITION_TYPE_PATTERNS = collections.OrderedDict([(_type , re.compile(_pattern).match) for _type , _pattern in _CONDITION_TYPES ])
 
 
 
 class CTCondition(object):
-
+    """crontab条件判断类，每个条件解析成对应判断公式与数值
+        test:
+            >>> c = CTCondition("12-23/3")
+            >>> c.judge(15) == True
+            >>> c.judge(9) == False
+    """
     
 
-    def __init__(self, condition , ):
-        self.condition_type = self._get_condition_type(condition)
-        self.judge = None # ct时间判断方法
+    def __init__(self, condition):
+        self.condition_type , group_tuples = self._get_condition_type(condition)
+        self._init_params(self.condition_type , group_tuples)
         self.condition_string = condition
 
-    def _get_condition_type(self.condition):
-        pass
+    def _get_condition_type(self , condition):
+        for _type , _pattern in _CONDITION_TYPE_PATTERNS.items():
+            match = _pattern(condition)
+            if match:
+                return _type , match.groups()
+        raise ValueError
 
-
+    def _init_params(self , condition_type , group_tuples):
+        self._start_time = None 
+        self._end_time = None 
+        self._every = None 
+        self.judge = None 
+        group_tuples = [ int(value) for value in group_tuples]
+        if self.condition_type == "ALL":
+            self.judge = self.return_true
+        elif self.condition_type == "EVERY":
+            self.judge = self.every 
+            self._every = group_tuples(0)
+        elif self.condition_type == "TIME_RANGE":
+            self.judge = self.time_range 
+            self._start_time , self._end_time = group_tuples 
+        elif self.condition_type == "TIME_RANGE_EVERY":
+            self.judge = self.time_range_every
+            self._start_time , self._end_time , self._every = group_tuples
+        else:
+            raise NotImplmetionError 
+        
     def return_true(object):
         return True
 
-    def every(self , time_value , value):
-        if value % time_value == 0:
+    def every(self ,value):
+        """实现 crontab中 */3 判断语句
+            params:
+                time_value                      crontab每time_value时间
+                value                           传入的时间数字 
+            return 
+                True                            符合ct条件
+                False                           不符合该条件
+            raise 
+                None 
+        """
+        if value % self._every == 0:
             return True 
         return False
 
-    def time_range(self , start_time , end_time , value):
-        if value >= start_time and end_time >= value:
-            return False
+    def time_range(self , value):
+        if value >= self._start_time and self._end_time >= value:
+            return True 
         return False
    
-   def time_range_every(self , start_time , end_time , time_diff , value):
-       if self.time_range(start_time , end_time , value) is True:
-           return self.every(time_diff , value)
-       return False
-        
+    def time_range_every(self , value):
+        """实现 crontab中 18-23/3 判断语句,如果满足在18到23之间
+            params:
+                start_time                      判断时间的开始时间
+                end_time                        判断时间的结束时间
+                time_diff                       crontab每time_value时间
+                value                           时间数字，整形
+            return 
+                True                            符合条件
+                False                           不符合条件判断
+            raise
+                None 
+        """
+        if self.time_range(value) is True:
+            return self.every(value)
+        return False
+    
+    def __str__(self):
+        return "start_time:{start_time} end_time:{end_time} every:{every}".format(start_time = self._start_time , end_time = self._end_time , every = self._every)
+
 class CTItem(object):
 
 
@@ -58,6 +120,7 @@ class CTItem(object):
                 if condition.judge(obj) is True:
                     return True
             return False
+
     def __ne__(self , obj):
         return not self.__eq__(obj)
 
@@ -132,6 +195,4 @@ class Ticker(threading.Thread):
 
 
 if __name__ == "__main__":
-
-
-    Ticker().start()
+    pass
