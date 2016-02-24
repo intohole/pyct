@@ -170,21 +170,15 @@ class TimeObject(object):
     def __eq__(self , obj):
         if obj and isinstance(obj,(list , tuple)):
             if len(obj) == 5:
-                print obj 
                 if self.week != obj[4]:
-                    print "week"
                     return False
                 if self.month != obj[3]:
-                    print "month"
                     return False
                 if self.day != obj[2]:
-                    print "day"
                     return False
                 if self.hour != obj[1]:
-                    print "hour"
                     return False
                 if self.minute != obj[0]:
-                    print "minute"
                     return False
             return True
         return False
@@ -199,24 +193,26 @@ class PyCt(threading.Thread):
         self._run_flag = True
         self.crontabs = []
         self.workers = thread2.ThreadPool(pool_size) 
-        self.workers.start()
         self.setDaemon(True)
         self.start()
-        self.join()
+        self.workers.start()
         
     def add(self , ctstring , command , *argv , **kw ):
         self.crontabs.append(TimeObject(thread2.Command(command , *argv , **kw) , ctstring))
 
     def run(self):
-
+        while time.gmtime(time.time()).tm_sec <=1:
+            time.sleep(0.1)
+        last_minute = time.gmtime(time.time()).tm_min 
         while self._run_flag:
-            time.sleep(60)
+            time.sleep(1)
             _now = time.gmtime(time.time())
-            print "run"
+            if ( _now.tm_min - last_minute) <1:
+                continue 
+            last_minute = _now.tm_min 
             for ct in self.crontabs:
                 if ct == (_now.tm_min , _now.tm_hour , _now.tm_mday, _now.tm_mon , _now.tm_wday):
-                    self.workers.add_command(ct.command)
-
+                    self.workers.insert(ct.command)
 
 
 
@@ -225,4 +221,9 @@ if __name__ == "__main__":
     def p(*argv , **kw):
         print "hi"
     c.add("* * * * *", p , *[] , **{}) 
+    
+    _now = time.gmtime(time.time())
+    print c.crontabs[0] == (_now.tm_min , _now.tm_hour , _now.tm_mday, _now.tm_mon , _now.tm_wday)
+    time.sleep(100)
+    print c.crontabs
     print c == (3 , 12 , 13 ,14 ,15)
