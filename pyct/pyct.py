@@ -34,10 +34,12 @@ class CTCondition(object):
     """
     
 
-    def __init__(self, condition):
+    def __init__(self, condition , time_type ):
+        self.time_type = time_type 
+        self.condition_string = condition
         self.condition_type , group_tuples = self._get_condition_type(condition)
         self._init_params(self.condition_type , group_tuples)
-        self.condition_string = condition
+        self._check_params()
 
     def _get_condition_type(self , condition):
         for _type , _pattern in _CONDITION_TYPE_PATTERNS.items():
@@ -69,8 +71,33 @@ class CTCondition(object):
             self._start_time , self._end_time , self._every = group_tuples
         else:
             raise NotImplmetionError 
-        
     
+    def _check_num_range(self , value):
+        if value is None:
+            return True 
+        _value_range = None  
+        if self.time_type == "hour":
+            _value_range = 23 
+        elif self.time_range == "minute":
+            _value_range = 59
+        elif self.time_type == "day":
+            _value_range = 31 
+        elif self.time_type == "month":
+            _value_range = 12 
+        elif self.time_type == "week":
+            _value_range = 6
+        if value != "*" and value > _value_range:
+            raise ValueError("crontab time is valid , value range not right , please check %s" % self.condition_string)
+
+    def _check_params(self):
+        if self._start_time and self._end_time:
+            if self._start_time >=self._end_time:
+                raise ValueError("crontab time is valid ! %s" % self.condition_string)
+        self._check_num_range(self._start_time) 
+        self._check_num_range(self._end_time)
+        self._check_num_range(self._num)
+        self._check_num_range(self._every)
+
     def equal(self , value):
         if self._num == "*" or self._num == value:
             return True 
@@ -118,7 +145,7 @@ class CTCondition(object):
 
 class CTItem(object):
 
-
+    TIME_TYPE = ["minute" , "hour" , "day" , "month" , "week"]
 
     def __init__(self , condition ):
         self.conditions = self.parse(condition)
@@ -136,7 +163,7 @@ class CTItem(object):
 
     def parse(self , condition):
         params = condition.split(",")
-        return [CTCondition(param) for param in params]
+        return [CTCondition(param , self.TIME_TYPE[index]) for index , param in enumerate(params)]
             
 class TimeObject(object):
     """ct 字符串保存结构；方便后面去判断，隐藏解析
