@@ -165,7 +165,8 @@ class CTItem(object):
         params = condition.split(",")
         return [CTCondition(param , self.TIME_TYPE[index]) for index , param in enumerate(params)]
             
-class TimeObject(object):
+class CrontabObject(object):
+
     """ct 字符串保存结构；方便后面去判断，隐藏解析
         * * * * *
         - - - - -
@@ -209,8 +210,7 @@ class TimeObject(object):
                     return False
             return True
         return False
-
-
+    
     
 class PyCt(threading.Thread):
 
@@ -225,7 +225,7 @@ class PyCt(threading.Thread):
         self.workers.start()
         
     def add(self , ctstring , command , *argv , **kw ):
-        self.crontabs.append(TimeObject(thread2.Command(command , *argv , **kw) , ctstring))
+        self.crontabs.append(CrontabObject(thread2.Command(command , *argv , **kw) , ctstring))
 
     def run(self):
         while time.gmtime(time.time()).tm_sec <=1:
@@ -240,17 +240,3 @@ class PyCt(threading.Thread):
             for ct in self.crontabs:
                 if ct == (_now.tm_min , _now.tm_hour , _now.tm_mday, _now.tm_mon , _now.tm_wday):
                     self.workers.insert(ct.command)
-
-
-
-if __name__ == "__main__":
-    c = PyCt()
-    def p(*argv , **kw):
-        print "hi"
-    c.add("* * * * *", p , *[] , **{}) 
-    
-    _now = time.gmtime(time.time())
-    print c.crontabs[0] == (_now.tm_min , _now.tm_hour , _now.tm_mday, _now.tm_mon , _now.tm_wday)
-    time.sleep(100)
-    print c.crontabs
-    print c == (3 , 12 , 13 ,14 ,15)
