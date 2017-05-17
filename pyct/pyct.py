@@ -144,10 +144,15 @@ class CTCondition(object):
         return "start_time:{start_time} end_time:{end_time} every:{every} num:{num}".format(start_time = self._start_time , end_time = self._end_time , every = self._every , num = self._num )
 
 class CTItem(object):
+    """crontab time pattern item
+    """
 
     TIME_TYPE = ["minute" , "hour" , "day" , "month" , "week"]
 
     def __init__(self , condition ):
+        """parse time crontab string 2 function
+            param:condition:basestring:crontab string
+        """
         self.conditions = self.parse(condition)
         self.condition_string = condition
 
