@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 kw = dict(
     name='pyct',
-    version='0.0.1',
+    version='0.0.2',
     description='python simple crontab',
     author='intohole',
     author_email='intoblack86@gmail.com',

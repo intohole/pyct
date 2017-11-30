@@ -11,7 +11,7 @@ from b2 import thread2
 from b2 import exceptions2
 import re
 import collections
-
+from b2 import object2
 
 _CONDITION_TYPES =[
                     ("ALL", "^\\*$"),
@@ -215,8 +215,7 @@ class CrontabObject(object):
                     return False
             return True
         return False
-    
-    
+
 class PyCt(threading.Thread):
 
 
@@ -245,3 +244,29 @@ class PyCt(threading.Thread):
             for ct in self.crontabs:
                 if ct == (_now.tm_min , _now.tm_hour , _now.tm_mday, _now.tm_mon , _now.tm_wday):
                     self.workers.insert(ct.command)
+
+    def join(self):
+        pass
+
+def cron(fn):
+    """
+        Test:
+            >>> @cron("* * * * *",*[],**{})
+            >>> def p(*argv,**kw):
+            ...     print "hi"
+            >>> time.sleep(10)
+    """
+    _p = PyCt()
+    def warper(ctstring,*argv,**kw):
+        _p.add(fn,ctstring,*argv,**kw)
+    return warper
+
+
+if __name__ == "__main__":
+    
+    @cron("* * * * *", *[],**{})
+    def p():
+        print "hi" 
+    @cron("* * * * *", *[],**{})
+    def c():
+        print "hi" 
