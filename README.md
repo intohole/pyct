@@ -18,6 +18,19 @@ time.sleep(100) # 或者用c.join()
 ```
 
 
+
++ 修饰器模式
+
+
+```python
+from pyct import pyct
+
+
+@pyct.cron("* * * * *",**[],*kw)
+def p():
+    print "hi"
+```
+
 后续计划
 ------
 + 分布式crontab系统
